@@ -4,69 +4,145 @@ let category = document.getElementById("category");
 let expenseList = document.getElementById("expenseList");
 let form = document.getElementById("expenseForm");
 
-let expenses = [];
-let editIndex = -1;
+let editId = null;
 
-let storedExpenses = localStorage.getItem("expenses");
-if (storedExpenses !== null) {
-    expenses = JSON.parse(storedExpenses);
-}
-displayExpenses();
+const API_URL = "http://localhost:3000/expenses";
 
-form.addEventListener("submit", function(event) {
+
+// Load expenses when page opens
+window.addEventListener("DOMContentLoaded", getExpenses);
+
+
+// Add or update expense
+form.addEventListener("submit", async function(event) {
     event.preventDefault();
-    
+
     let expense = {
         amount: amount.value,
         description: description.value,
         category: category.value
     };
 
-     if (editIndex == -1){
-        expenses.push(expense);
-    } else {
-        expenses[editIndex] = expense;
-        editIndex = -1;
-    }
-    localStorage.setItem("expenses", JSON.stringify(expenses));
-    form.reset();
-    displayExpenses();
+    try {
+        if (editId === null) {
 
+            // CREATE
+            await fetch(API_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(expense)
+            });
+
+        } else {
+
+            // UPDATE
+            await fetch(`${API_URL}/${editId}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(expense)
+            });
+
+            editId = null;
+        }
+
+        form.reset();
+        getExpenses();
+
+    } catch (error) {
+        console.log("Error:", error);
+    }
 });
 
 
-function displayExpenses() {
-    expenseList.innerHTML = "";
-    for (let i = 0; i < expenses.length; i++) {
-        let expense = expenses[i];
-        expenseList.innerHTML += `
-            <div class="expense">
-                <p>${expense.amount}</p>
-                <p>${expense.description}</p>
-                <p>${expense.category}</p>
+// Get all expenses
+async function getExpenses() {
 
-                <button type="button" class="btn btn-warning" onclick="editExpense(${i})">
-                    Edit
-                </button>
+    try {
+        let response = await fetch(API_URL);
 
-                <button class="btn btn-danger" onclick="deleteExpense(${i})">
-                    Delete
-                </button>
+        let expenses = await response.json();
 
-            </div> `;
+        displayExpenses(expenses);
+
+    } catch (error) {
+        console.log("Error:", error);
     }
 }
 
-function editExpense(index) {
-    let expense = expenses[index];
-    amount.value = expense.amount;
-    description.value = expense.description;
-    category.value = expense.category;
-    editIndex = index;
+
+// Display expenses
+function displayExpenses(expenses) {
+
+    expenseList.innerHTML = "";
+
+    for (let expense of expenses) {
+
+        expenseList.innerHTML += `
+            <div class="expense mb-3 p-3 border rounded">
+
+                <p><strong>Amount:</strong> ${expense.amount}</p>
+
+                <p><strong>Description:</strong> ${expense.description}</p>
+
+                <p><strong>Category:</strong> ${expense.category}</p>
+
+                <button 
+                    type="button"
+                    class="btn btn-warning"
+                    onclick="editExpense(${expense.id})">
+                    Edit
+                </button>
+
+                <button 
+                    type="button"
+                    class="btn btn-danger"
+                    onclick="deleteExpense(${expense.id})">
+                    Delete
+                </button>
+
+            </div>
+        `;
+    }
 }
 
-function deleteExpense(index) {
-    expenses.splice(index, 1);
-    localStorage.setItem("expenses", JSON.stringify(expenses));
-    displayExpenses();
+
+// Edit expense
+async function editExpense(id) {
+
+    try {
+
+        let response = await fetch(`${API_URL}/${id}`);
+
+        let expense = await response.json();
+
+        amount.value = expense.amount;
+        description.value = expense.description;
+        category.value = expense.category;
+
+        editId = id;
+
+    } catch (error) {
+        console.log("Error:", error);
+    }
+}
+
+
+// Delete expense
+async function deleteExpense(id) {
+
+    try {
+
+        await fetch(`${API_URL}/${id}`, {
+            method: "DELETE"
+        });
+
+        getExpenses();
+
+    } catch (error) {
+        console.log("Error:", error);
+    }
 }
